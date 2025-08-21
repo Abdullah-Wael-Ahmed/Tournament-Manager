@@ -1,0 +1,38 @@
+# Use official PHP image with Apache
+FROM php:8.2-apache
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git unzip libzip-dev sqlite3 libsqlite3-dev libonig-dev libxml2-dev \
+    && docker-php-ext-install pdo pdo_mysql pdo_sqlite mbstring zip exif pcntl bcmath fileinfo \
+    && docker-php-ext-enable pdo_sqlite fileinfo
+
+# Enable Apache mod_rewrite for Laravel
+RUN a2enmod rewrite
+
+# Set working directory
+WORKDIR /var/www/html
+
+# Copy composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# Copy app files
+COPY . .
+
+# Install PHP dependencies
+RUN composer install --no-dev --optimize-autoloader
+
+# Copy environment file (Render will set env vars, but this keeps defaults)
+COPY .env.example .env
+
+# Generate app key
+RUN php artisan key:generate
+
+# Make sure storage and bootstrap/cache are writable
+RUN chown -R www-data:www-data storage bootstrap/cache
+
+# Expose Apache port
+EXPOSE 80
+
+# Start Apache server
+CMD ["apache2-foreground"]
